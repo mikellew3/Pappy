@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
-import { supabase } from '../lib/supabase'
 import type { Pick } from '../lib/types'
+import { TOURNAMENTS } from '../data/tournaments'
+import { SEED_PICKS } from '../data/seedPicks'
 
 export interface NewPick {
   tournament_name: string
@@ -9,95 +10,117 @@ export interface NewPick {
   finish: string | null
 }
 
-export type PickPatch = Partial<Omit<Pick, 'id' | 'season_id' | 'user_id' | 'created_at' | 'updated_at'>>
+export type PickPatch = Partial<Omit<Pick, 'id'>>
 
 interface UsePicksResult {
   picks: Pick[]
   loading: boolean
-  error: string | null
   addPick: (input: NewPick) => Promise<{ error: string | null }>
   updatePick: (id: string, patch: PickPatch) => Promise<{ error: string | null }>
   deletePick: (id: string) => Promise<{ error: string | null }>
   resetSeason: () => Promise<{ error: string | null }>
-  refresh: () => Promise<void>
 }
 
-// Schedule order: by tournament date (undated last), then creation time.
+const STORAGE_KEY = 'pappy-one-and-done-2026'
+
+const dateByName = new Map(TOURNAMENTS.map((t) => [t.name.toLowerCase(), t.start_date]))
+
+function newId(): string {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID()
+  return `p_${Date.now()}_${Math.random().toString(36).slice(2)}`
+}
+
+// Schedule order: by tournament date (undated last), then insertion order.
 function sortPicks(rows: Pick[]): Pick[] {
-  return [...rows].sort((a, b) => {
-    const da = a.tournament_date ?? '9999-12-31'
-    const db = b.tournament_date ?? '9999-12-31'
-    if (da !== db) return da < db ? -1 : 1
-    return a.created_at < b.created_at ? -1 : 1
-  })
+  return rows
+    .map((p, i) => ({ p, i }))
+    .sort((a, b) => {
+      const da = a.p.tournament_date ?? '9999-12-31'
+      const db = b.p.tournament_date ?? '9999-12-31'
+      if (da !== db) return da < db ? -1 : 1
+      return a.i - b.i
+    })
+    .map((x) => x.p)
 }
 
-export function usePicks(
-  seasonId: string | undefined,
-  userId: string | undefined,
-): UsePicksResult {
+function seedPicks(): Pick[] {
+  return SEED_PICKS.map((s) => ({
+    id: newId(),
+    tournament_name: s.tournament_name,
+    tournament_date: dateByName.get(s.tournament_name.toLowerCase()) ?? null,
+    player_name: s.player_name,
+    finish: s.finish || null,
+  }))
+}
+
+function load(): Pick[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (raw) return JSON.parse(raw) as Pick[]
+  } catch {
+    /* fall through to seed */
+  }
+  const seeded = seedPicks()
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(seeded))
+  } catch {
+    /* ignore quota / private-mode errors */
+  }
+  return seeded
+}
+
+/**
+ * Picks state, persisted to localStorage. The async signatures keep the call
+ * sites unchanged and leave room for a future networked backend.
+ */
+export function usePicks(): UsePicksResult {
   const [picks, setPicks] = useState<Pick[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  const refresh = useCallback(async () => {
-    if (!seasonId) return
-    setLoading(true)
-    const { data, error: err } = await supabase
-      .from('picks')
-      .select('*')
-      .eq('season_id', seasonId)
-    if (err) setError(err.message)
-    else setPicks(sortPicks((data ?? []) as Pick[]))
-    setLoading(false)
-  }, [seasonId])
 
   useEffect(() => {
-    if (!seasonId) return
-    void refresh()
-  }, [seasonId, refresh])
+    setPicks(sortPicks(load()))
+    setLoading(false)
+  }, [])
+
+  const persist = useCallback((next: Pick[]) => {
+    const sorted = sortPicks(next)
+    setPicks(sorted)
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(sorted))
+    } catch {
+      return 'Save failed'
+    }
+    return null
+  }, [])
 
   const addPick = useCallback(
     async (input: NewPick) => {
-      if (!seasonId || !userId) return { error: 'No active season.' }
-      const { data, error: err } = await supabase
-        .from('picks')
-        .insert({ ...input, season_id: seasonId, user_id: userId })
-        .select()
-        .single()
-      if (err) return { error: err.message }
-      setPicks((prev) => sortPicks([...prev, data as Pick]))
-      return { error: null }
+      const error = persist([...picks, { id: newId(), ...input }])
+      return { error }
     },
-    [seasonId, userId],
+    [picks, persist],
   )
 
-  const updatePick = useCallback(async (id: string, patch: PickPatch) => {
-    const { data, error: err } = await supabase
-      .from('picks')
-      .update(patch)
-      .eq('id', id)
-      .select()
-      .single()
-    if (err) return { error: err.message }
-    setPicks((prev) => sortPicks(prev.map((p) => (p.id === id ? (data as Pick) : p))))
-    return { error: null }
-  }, [])
+  const updatePick = useCallback(
+    async (id: string, patch: PickPatch) => {
+      const error = persist(picks.map((p) => (p.id === id ? { ...p, ...patch } : p)))
+      return { error }
+    },
+    [picks, persist],
+  )
 
-  const deletePick = useCallback(async (id: string) => {
-    const { error: err } = await supabase.from('picks').delete().eq('id', id)
-    if (err) return { error: err.message }
-    setPicks((prev) => prev.filter((p) => p.id !== id))
-    return { error: null }
-  }, [])
+  const deletePick = useCallback(
+    async (id: string) => {
+      const error = persist(picks.filter((p) => p.id !== id))
+      return { error }
+    },
+    [picks, persist],
+  )
 
   const resetSeason = useCallback(async () => {
-    if (!seasonId) return { error: 'No active season.' }
-    const { error: err } = await supabase.from('picks').delete().eq('season_id', seasonId)
-    if (err) return { error: err.message }
-    setPicks([])
-    return { error: null }
-  }, [seasonId])
+    const error = persist([])
+    return { error }
+  }, [persist])
 
-  return { picks, loading, error, addPick, updatePick, deletePick, resetSeason, refresh }
+  return { picks, loading, addPick, updatePick, deletePick, resetSeason }
 }

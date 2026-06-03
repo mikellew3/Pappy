@@ -6,46 +6,37 @@ import { PicksTable } from './PicksTable'
 import { UsedPlayersPanel } from './UsedPlayersPanel'
 import { ResetModal } from './ResetModal'
 import type { AutoOption } from './Autocomplete'
-import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
-import { useReferenceData } from '../hooks/useReferenceData'
-import { useSeason } from '../hooks/useSeason'
 import { usePicks } from '../hooks/usePicks'
 import { formatShortDate } from '../lib/format'
-
-const YEAR = 2026
+import { TOURNAMENTS } from '../data/tournaments'
+import { PLAYERS } from '../data/players'
 
 export function Dashboard() {
-  const { user, signOut } = useAuth()
   const { showToast } = useToast()
-  const { tournaments, players, loading: refLoading, error: refError } = useReferenceData(YEAR)
-  const { season, loading: seasonLoading, error: seasonError } = useSeason(user?.id, YEAR)
-  const { picks, addPick, updatePick, deletePick, resetSeason } = usePicks(
-    season?.id,
-    user?.id,
-  )
+  const { picks, loading, addPick, updatePick, deletePick, resetSeason } = usePicks()
 
   const [resetOpen, setResetOpen] = useState(false)
 
   const tournamentOptions: AutoOption[] = useMemo(
     () =>
-      tournaments.map((t) => ({
-        key: t.id,
+      TOURNAMENTS.map((t) => ({
+        key: t.name,
         name: t.name,
         date: formatShortDate(t.start_date),
-        tag: t.tag,
+        tag: t.tag ?? null,
       })),
-    [tournaments],
+    [],
   )
 
   const playerOptions: AutoOption[] = useMemo(
-    () => players.map((p) => ({ key: p.id, name: p.name })),
-    [players],
+    () => PLAYERS.map((name) => ({ key: name, name })),
+    [],
   )
 
   const tournamentDateByName = useMemo(
-    () => new Map(tournaments.map((t) => [t.name.toLowerCase(), t.start_date])),
-    [tournaments],
+    () => new Map(TOURNAMENTS.map((t) => [t.name.toLowerCase(), t.start_date])),
+    [],
   )
 
   const usedTournaments = useMemo(
@@ -80,23 +71,9 @@ export function Dashboard() {
     showToast(error ? 'Reset failed' : 'Season reset', !!error)
   }
 
-  const error = refError || seasonError
-  const booting = seasonLoading || refLoading
-
   return (
     <div className="wrap">
-      <div className="session-bar">
-        <span>◆ {user?.email}</span>
-        <button onClick={() => void signOut()}>Sign Out</button>
-      </div>
-
       <Masthead />
-
-      {error && (
-        <div className="auth-error" style={{ textAlign: 'center' }}>
-          {error}
-        </div>
-      )}
 
       <StatStrip picks={picks} />
 
@@ -117,7 +94,7 @@ export function Dashboard() {
       <div className="section-head">
         <h2 className="section-title">Season Picks</h2>
         <span className="section-meta">
-          {booting ? 'Loading…' : `${picks.length} ${picks.length === 1 ? 'Entry' : 'Entries'}`}
+          {loading ? 'Loading…' : `${picks.length} ${picks.length === 1 ? 'Entry' : 'Entries'}`}
         </span>
       </div>
 
