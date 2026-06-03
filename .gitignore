@@ -34,3 +34,6 @@ dist-ssr
 
 # Vite / PWA generated
 dev-dist
+
+# TypeScript incremental build info
+*.tsbuildinfo
