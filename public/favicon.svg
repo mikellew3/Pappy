@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <rect width="64" height="64" fill="#f5f1e8"/>
+  <rect x="3" y="3" width="58" height="58" fill="none" stroke="#1d4d2e" stroke-width="2"/>
+  <text x="32" y="30" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-weight="600" font-size="26" fill="#1d4d2e">P</text>
+  <text x="32" y="30" text-anchor="middle" font-family="Georgia, serif" font-style="italic" font-size="26" fill="#b8860b" dx="13">&amp;</text>
+  <circle cx="32" cy="46" r="6" fill="none" stroke="#b8860b" stroke-width="2"/>
+  <text x="32" y="49" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="7" fill="#b8860b">26</text>
+</svg>
