@@ -5,6 +5,8 @@ import { AddPickForm } from './AddPickForm'
 import { PicksTable } from './PicksTable'
 import { UsedPlayersPanel } from './UsedPlayersPanel'
 import { ResetModal } from './ResetModal'
+import { SyncBar } from './SyncBar'
+import { SyncSettingsModal } from './SyncSettingsModal'
 import type { AutoOption } from './Autocomplete'
 import { useToast } from '../context/ToastContext'
 import { usePicks } from '../hooks/usePicks'
@@ -14,9 +16,20 @@ import { PLAYERS } from '../data/players'
 
 export function Dashboard() {
   const { showToast } = useToast()
-  const { picks, loading, addPick, updatePick, deletePick, resetSeason } = usePicks()
+  const {
+    picks,
+    loading,
+    addPick,
+    updatePick,
+    deletePick,
+    resetSeason,
+    syncStatus,
+    configureSync,
+    syncNow,
+  } = usePicks()
 
   const [resetOpen, setResetOpen] = useState(false)
+  const [syncOpen, setSyncOpen] = useState(false)
 
   const tournamentOptions: AutoOption[] = useMemo(
     () =>
@@ -73,6 +86,8 @@ export function Dashboard() {
 
   return (
     <div className="wrap">
+      <SyncBar status={syncStatus} onOpen={() => setSyncOpen(true)} />
+
       <Masthead />
 
       <StatStrip picks={picks} />
@@ -127,6 +142,14 @@ export function Dashboard() {
         open={resetOpen}
         onCancel={() => setResetOpen(false)}
         onConfirm={() => void confirmReset()}
+      />
+
+      <SyncSettingsModal
+        open={syncOpen}
+        status={syncStatus}
+        onClose={() => setSyncOpen(false)}
+        onSave={configureSync}
+        onSyncNow={syncNow}
       />
     </div>
   )
