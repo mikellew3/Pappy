@@ -1,12 +1,29 @@
-// The 19 existing picks, used to seed a fresh browser on first run.
-// (tournament_date is resolved from TOURNAMENTS when seeding — see usePicks.)
-export interface SeedPick {
+// ===========================================================================
+// THE SEASON RECORD — source of truth for the 2026 picks.
+//
+// This file is authoritative. When it changes and the app is redeployed, every
+// device adopts this list on next open (overriding any local in-app edits).
+//
+// TO UPDATE WEEKLY:
+//   1. Add / edit entries in SEASON_PICKS below (one player per tournament,
+//      each player used at most once all season).
+//   2. Bump DATA_VERSION to today's date so devices pick up the change.
+//   3. Commit & deploy.
+//
+// tournament_date is resolved automatically from TOURNAMENTS (src/data).
+// finish is free text: T12, WIN, MC, WD, 5, etc. Leave '' if not played yet.
+// ===========================================================================
+
+/** Bump this (e.g. to today's date) whenever SEASON_PICKS changes. */
+export const DATA_VERSION = '2026-06-03'
+
+export interface SeasonPick {
   tournament_name: string
   player_name: string
   finish: string
 }
 
-export const SEED_PICKS: SeedPick[] = [
+export const SEASON_PICKS: SeasonPick[] = [
   { tournament_name: 'Sony Open', player_name: 'Nick Taylor', finish: 'T13' },
   { tournament_name: 'American Express', player_name: 'Ludvig Aberg', finish: 'WD' },
   { tournament_name: 'Farmers Insurance Open', player_name: 'S.H. Kim', finish: 'T2' },

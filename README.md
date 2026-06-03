@@ -7,18 +7,17 @@ Private, single-user, installable as a PWA.
 > Pick one player per tournament. Use each player only once all season. Track
 > finishes, wins, top-10s, and missed cuts.
 
-**Works with zero setup.** Picks save to your browser's `localStorage` — open
-the app and start picking. Optional **cross-device sync** can be turned on at
-runtime via a tiny Cloudflare Worker (see below); it stays local-first, so the
-app is always instant and works offline.
+**Works with zero setup.** The season record lives in a committed data file
+(`src/data/seasonPicks.ts`) — that's the source of truth. The app caches it in
+`localStorage` for instant/offline use; when the record changes and the app is
+redeployed, every device adopts the new picks automatically.
 
 ## Stack
 
 - **Vite + React + TypeScript**
 - **Tailwind** for layout utilities (the visual design is bespoke CSS)
 - **PWA** — manifest, icons, service worker (app shell cached offline)
-- **localStorage** for persistence (local-first)
-- **Cloudflare Worker + KV** for optional cross-device sync (`worker/`)
+- **localStorage** cache over a committed picks file (source of truth)
 - **Vercel** for deployment (static, zero env vars)
 
 ## Project layout
@@ -32,15 +31,12 @@ app is always instant and works offline.
 ├── public/
 │   ├── favicon.svg
 │   └── icons/                  # generated PWA icons
-├── worker/                     # Cloudflare Worker + KV sync endpoint
-│   ├── src/index.ts
-│   └── wrangler.toml
 └── src/
     ├── main.tsx / App.tsx
     ├── context/                # Toast provider
-    ├── hooks/usePicks.ts       # local-first picks state + sync reconcile
-    ├── data/                   # tournaments, players, seed picks
-    ├── lib/                    # types, finish/format helpers, sync client
+    ├── hooks/usePicks.ts       # localStorage cache over the committed record
+    ├── data/                   # tournaments, players, seasonPicks (the record)
+    ├── lib/                    # types, finish/format helpers
     └── components/             # Masthead, StatStrip, AddPickForm, PicksTable, …
 ```
 
@@ -72,56 +68,36 @@ Point a domain (e.g. `pappy.gmdhc.com`) at the deployment when ready.
 
 All reference data lives in `src/data/` and is easy to edit by hand:
 
+- `seasonPicks.ts` — **the season record** (source of truth). See "Updating the
+  picks" above.
 - `tournaments.ts` — 2026 schedule (45 events) with weeks, ISO dates, and
   major/signature/playoff tags.
 - `players.ts` — PGA Tour roster (~220 names) for the player autocomplete.
-- `seedPicks.ts` — the 19 existing picks, loaded the first time the app runs in
-  a fresh browser.
 
-Picks are stored under the `localStorage` key `pappy-one-and-done-2026`. Use
-**Export JSON** to back them up and **Reset Season** to clear. Finish strings
-are free text; auto-coloring: `WIN`/`1` → gold, top-10 → green,
-`MC`/`WD`/`DQ`/`CUT` → red.
+The app caches the loaded picks under the `localStorage` key
+`pappy-one-and-done-2026` (with `pappy-data-version` tracking which record
+version is cached). Use **Export JSON** to back up and **Reset Season** to
+clear. Finish strings are free text; auto-coloring: `WIN`/`1` → gold,
+top-10 → green, `MC`/`WD`/`DQ`/`CUT` → red.
 
-## Cross-device sync (optional)
+## Updating the picks (weekly)
 
-Sync keeps one shared picks document in **Cloudflare KV**, fronted by a small
-Worker and gated by a passphrase you choose. It's **local-first**: every change
-saves to `localStorage` instantly and works offline; the Worker just reconciles
-devices (last-write-wins by timestamp). There are no user accounts.
+The committed record is the source of truth, so updating is a small code edit:
 
-### One-time: deploy the Worker
+1. Open **`src/data/seasonPicks.ts`**.
+2. Add or edit entries in `SEASON_PICKS` (one player per tournament; each player
+   used at most once all season). `finish` is free text — `T12`, `WIN`, `MC`,
+   `WD`, `5`, … — leave `''` until the event is played.
+3. **Bump `DATA_VERSION`** (e.g. to today's date). This is what tells already-open
+   browsers to adopt the new record instead of their cached copy.
+4. Commit and deploy. Every device shows the update next time it opens.
 
-```bash
-cd worker
-npm install
-npx wrangler login
+Tournament dates are filled in automatically from `src/data/tournaments.ts`.
 
-# Create the KV namespace, then paste the returned id into wrangler.toml
-npx wrangler kv namespace create PAPPY_KV
-
-# Choose a strong passphrase and set it as the Worker secret
-npx wrangler secret put SYNC_SECRET
-
-npx wrangler deploy
-```
-
-Deploy prints your Worker URL, e.g. `https://pappy-sync.<you>.workers.dev`.
-
-### Turn it on in the app (per device)
-
-1. Click the **Local only** pill at the top-right → the Cloud Sync panel.
-2. Paste the **Worker URL** and the **passphrase** (the `SYNC_SECRET` value).
-3. **Save.** The pill turns **Synced**.
-
-Repeat on each device with the same URL + passphrase. The status pill shows
-`Synced` / `Syncing…` / `Offline` / `Check passphrase`. Config is stored locally
-(keys `pappy-sync-url`, `pappy-sync-key`) — nothing is baked into the build, so
-the Vercel deploy stays env-free. (You can optionally pre-fill the URL with a
-`VITE_SYNC_URL` build env var.)
-
-The Worker exposes `GET`/`PUT /picks` with `Authorization: Bearer <passphrase>`
-and permissive CORS; see `worker/src/index.ts`.
+> The in-app Add/Edit/Delete controls still work and persist locally between
+> updates — handy for a quick tweak — but a deploy with a new `DATA_VERSION`
+> re-adopts the committed record (it wins). Treat `seasonPicks.ts` as the
+> book of record. **Export JSON** backs up whatever is currently loaded.
 
 ## PWA / Add to Home Screen
 

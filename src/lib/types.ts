@@ -21,10 +21,3 @@ export interface Pick {
 
 /** Editable fields on a pick. */
 export type PickField = 'tournament_name' | 'tournament_date' | 'player_name' | 'finish'
-
-/** The full synced document: the picks plus a last-write-wins timestamp. */
-export interface PicksDocument {
-  picks: Pick[]
-  /** ms epoch of the last local mutation; 0 means "never edited" (fresh seed). */
-  updatedAt: number
-}

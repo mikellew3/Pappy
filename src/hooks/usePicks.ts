@@ -1,15 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import type { Pick, PicksDocument } from '../lib/types'
+import { useCallback, useEffect, useState } from 'react'
+import type { Pick } from '../lib/types'
 import { TOURNAMENTS } from '../data/tournaments'
-import { SEED_PICKS } from '../data/seedPicks'
-import {
-  getSyncConfig,
-  isSyncEnabled,
-  pullRemote,
-  pushRemote,
-  setSyncConfig,
-  SyncAuthError,
-} from '../lib/sync'
+import { SEASON_PICKS, DATA_VERSION } from '../data/seasonPicks'
 
 export interface NewPick {
   tournament_name: string
@@ -20,13 +12,6 @@ export interface NewPick {
 
 export type PickPatch = Partial<Omit<Pick, 'id'>>
 
-export type SyncStatus =
-  | 'disabled' // no sync configured
-  | 'syncing' // request in flight
-  | 'synced' // up to date with remote
-  | 'offline' // network error, will retry
-  | 'unauthorized' // bad passphrase
-
 interface UsePicksResult {
   picks: Pick[]
   loading: boolean
@@ -34,20 +19,22 @@ interface UsePicksResult {
   updatePick: (id: string, patch: PickPatch) => Promise<{ error: string | null }>
   deletePick: (id: string) => Promise<{ error: string | null }>
   resetSeason: () => Promise<{ error: string | null }>
-  // sync
-  syncStatus: SyncStatus
-  configureSync: (url: string, secret: string) => void
-  syncNow: () => void
 }
 
 const STORAGE_KEY = 'pappy-one-and-done-2026'
-const PUSH_DEBOUNCE_MS = 700
+const VERSION_KEY = 'pappy-data-version'
 
 const dateByName = new Map(TOURNAMENTS.map((t) => [t.name.toLowerCase(), t.start_date]))
 
 function newId(): string {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID()
   return `p_${Date.now()}_${Math.random().toString(36).slice(2)}`
+}
+
+// Stable, deterministic id from the tournament (one pick per tournament) so the
+// committed record keeps the same ids across deploys.
+function slugId(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
 }
 
 // Schedule order: by tournament date (undated last), then insertion order.
@@ -63,9 +50,10 @@ function sortPicks(rows: Pick[]): Pick[] {
     .map((x) => x.p)
 }
 
-function seedPicks(): Pick[] {
-  return SEED_PICKS.map((s) => ({
-    id: newId(),
+// The authoritative record, compiled from the committed data file.
+function bundledPicks(): Pick[] {
+  return SEASON_PICKS.map((s) => ({
+    id: slugId(s.tournament_name),
     tournament_name: s.tournament_name,
     tournament_date: dateByName.get(s.tournament_name.toLowerCase()) ?? null,
     player_name: s.player_name,
@@ -73,173 +61,69 @@ function seedPicks(): Pick[] {
   }))
 }
 
-function saveLocal(doc: PicksDocument): void {
+function save(picks: Pick[]): string | null {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(doc))
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(picks))
+    localStorage.setItem(VERSION_KEY, DATA_VERSION)
+    return null
   } catch {
-    /* ignore quota / private-mode errors */
+    return 'Save failed'
   }
 }
 
 /**
- * Load the local document, migrating the legacy bare-array format. A brand-new
- * browser is seeded with updatedAt: 0 ("never edited") so that, if sync is on,
- * real remote data always wins over the fresh seed.
+ * Load picks. The committed file is the source of truth: when DATA_VERSION
+ * changes (a new deploy with updated picks), the bundled record is adopted and
+ * replaces local storage. Between updates, in-app edits persist locally.
  */
-function loadLocal(): PicksDocument {
+function load(): Pick[] {
   try {
+    const storedVersion = localStorage.getItem(VERSION_KEY)
     const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw) {
-      const parsed = JSON.parse(raw) as Pick[] | PicksDocument
-      if (Array.isArray(parsed)) {
-        // Legacy format: real user data without a timestamp — treat as current.
-        return { picks: parsed, updatedAt: Date.now() }
-      }
-      if (parsed && Array.isArray(parsed.picks)) {
-        return { picks: parsed.picks, updatedAt: Number(parsed.updatedAt) || 0 }
-      }
+    if (raw && storedVersion === DATA_VERSION) {
+      return JSON.parse(raw) as Pick[]
     }
   } catch {
-    /* fall through to seed */
+    /* fall through to adopt bundled */
   }
-  const doc: PicksDocument = { picks: seedPicks(), updatedAt: 0 }
-  saveLocal(doc)
-  return doc
+  const picks = bundledPicks()
+  save(picks)
+  return picks
 }
 
 export function usePicks(): UsePicksResult {
   const [picks, setPicks] = useState<Pick[]>([])
   const [loading, setLoading] = useState(true)
-  const [syncStatus, setSyncStatus] = useState<SyncStatus>(
-    isSyncEnabled() ? 'syncing' : 'disabled',
-  )
 
-  // Authoritative current document (kept in a ref so async callbacks see latest).
-  const docRef = useRef<PicksDocument>({ picks: [], updatedAt: 0 })
-  const pushTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const didInit = useRef(false)
-
-  const applyDoc = useCallback((doc: PicksDocument) => {
-    const sorted = sortPicks(doc.picks)
-    docRef.current = { picks: sorted, updatedAt: doc.updatedAt }
-    setPicks(sorted)
-  }, [])
-
-  // Reconcile local vs remote (last-write-wins). Called on init and manual sync.
-  const reconcile = useCallback(async () => {
-    if (!isSyncEnabled()) {
-      setSyncStatus('disabled')
-      return
-    }
-    setSyncStatus('syncing')
-    try {
-      const remote = await pullRemote()
-      const local = docRef.current
-
-      if (!remote) {
-        // Nothing remote yet — establish the baseline from local.
-        const baseline =
-          local.updatedAt === 0 ? { ...local, updatedAt: Date.now() } : local
-        applyDoc(baseline)
-        saveLocal(baseline)
-        await pushRemote(baseline)
-      } else if (remote.updatedAt >= local.updatedAt) {
-        applyDoc(remote)
-        saveLocal(remote)
-      } else {
-        await pushRemote(local)
-      }
-      setSyncStatus('synced')
-    } catch (e) {
-      setSyncStatus(e instanceof SyncAuthError ? 'unauthorized' : 'offline')
-    }
-  }, [applyDoc])
-
-  // Initial load (+ first sync).
   useEffect(() => {
-    if (didInit.current) return
-    didInit.current = true
-    applyDoc(loadLocal())
+    setPicks(sortPicks(load()))
     setLoading(false)
-    if (isSyncEnabled()) void reconcile()
-  }, [applyDoc, reconcile])
-
-  const schedulePush = useCallback((doc: PicksDocument) => {
-    if (!isSyncEnabled()) return
-    if (pushTimer.current) clearTimeout(pushTimer.current)
-    setSyncStatus('syncing')
-    pushTimer.current = setTimeout(() => {
-      void (async () => {
-        try {
-          await pushRemote(doc)
-          setSyncStatus('synced')
-        } catch (e) {
-          setSyncStatus(e instanceof SyncAuthError ? 'unauthorized' : 'offline')
-        }
-      })()
-    }, PUSH_DEBOUNCE_MS)
   }, [])
 
-  // Persist a new set of picks locally and queue a remote push.
-  const commit = useCallback(
-    (nextPicks: Pick[]) => {
-      const doc: PicksDocument = { picks: sortPicks(nextPicks), updatedAt: Date.now() }
-      docRef.current = doc
-      setPicks(doc.picks)
-      saveLocal(doc)
-      schedulePush(doc)
-      return null
-    },
-    [schedulePush],
-  )
+  const persist = useCallback((next: Pick[]) => {
+    const sorted = sortPicks(next)
+    setPicks(sorted)
+    return save(sorted)
+  }, [])
 
   const addPick = useCallback(
-    async (input: NewPick) => ({
-      error: commit([...docRef.current.picks, { id: newId(), ...input }]),
-    }),
-    [commit],
+    async (input: NewPick) => ({ error: persist([...picks, { id: newId(), ...input }]) }),
+    [picks, persist],
   )
 
   const updatePick = useCallback(
     async (id: string, patch: PickPatch) => ({
-      error: commit(docRef.current.picks.map((p) => (p.id === id ? { ...p, ...patch } : p))),
+      error: persist(picks.map((p) => (p.id === id ? { ...p, ...patch } : p))),
     }),
-    [commit],
+    [picks, persist],
   )
 
   const deletePick = useCallback(
-    async (id: string) => ({
-      error: commit(docRef.current.picks.filter((p) => p.id !== id)),
-    }),
-    [commit],
+    async (id: string) => ({ error: persist(picks.filter((p) => p.id !== id)) }),
+    [picks, persist],
   )
 
-  const resetSeason = useCallback(async () => ({ error: commit([]) }), [commit])
+  const resetSeason = useCallback(async () => ({ error: persist([]) }), [persist])
 
-  const configureSync = useCallback(
-    (url: string, secret: string) => {
-      setSyncConfig(url, secret)
-      if (isSyncEnabled()) void reconcile()
-      else setSyncStatus('disabled')
-    },
-    [reconcile],
-  )
-
-  const syncNow = useCallback(() => {
-    void reconcile()
-  }, [reconcile])
-
-  return {
-    picks,
-    loading,
-    addPick,
-    updatePick,
-    deletePick,
-    resetSeason,
-    syncStatus,
-    configureSync,
-    syncNow,
-  }
+  return { picks, loading, addPick, updatePick, deletePick, resetSeason }
 }
-
-export { getSyncConfig }
