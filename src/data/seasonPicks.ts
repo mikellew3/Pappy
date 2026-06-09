@@ -15,7 +15,7 @@
 // ===========================================================================
 
 /** Bump this (e.g. to today's date) whenever SEASON_PICKS changes. */
-export const DATA_VERSION = '2026-06-03'
+export const DATA_VERSION = '2026-06-09'
 
 export interface SeasonPick {
   tournament_name: string
@@ -43,4 +43,5 @@ export const SEASON_PICKS: SeasonPick[] = [
   { tournament_name: 'PGA Championship', player_name: 'Xander Schauffele', finish: 'T7' },
   { tournament_name: 'CJ Cup Byron Nelson', player_name: 'Jordan Spieth', finish: 'T19' },
   { tournament_name: 'Charles Schwab Challenge', player_name: 'Rickie Fowler', finish: 'MC' },
+  { tournament_name: 'Memorial Tournament', player_name: 'Ben Griffin', finish: 'MC' },
 ]
