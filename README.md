@@ -7,17 +7,18 @@ Private, single-user, installable as a PWA.
 > Pick one player per tournament. Use each player only once all season. Track
 > finishes, wins, top-10s, and missed cuts.
 
-**Works with zero setup.** The season record lives in a committed data file
-(`src/data/seasonPicks.ts`) — that's the source of truth. The app caches it in
-`localStorage` for instant/offline use; when the record changes and the app is
-redeployed, every device adopts the new picks automatically.
+**Works with zero setup.** You add, edit, and delete picks right in the app and
+they **save to your browser instantly** — your picks are authoritative and are
+never overwritten. `src/data/seasonPicks.ts` is only a one-time starting
+baseline applied the first time the app runs on a device (or after a deliberate
+reset). Picks persist per device; there is no cross-device sync.
 
 ## Stack
 
 - **Vite + React + TypeScript**
 - **Tailwind** for layout utilities (the visual design is bespoke CSS)
 - **PWA** — manifest, icons, service worker (app shell cached offline)
-- **localStorage** cache over a committed picks file (source of truth)
+- **localStorage** for persistence (your picks are authoritative)
 - **Vercel** for deployment (static, zero env vars)
 
 ## Project layout
@@ -68,36 +69,34 @@ Point a domain (e.g. `pappy.gmdhc.com`) at the deployment when ready.
 
 All reference data lives in `src/data/` and is easy to edit by hand:
 
-- `seasonPicks.ts` — **the season record** (source of truth). See "Updating the
-  picks" above.
+- `seasonPicks.ts` — the **starting baseline** applied once per device. Not a
+  live feed: after the first run, your in-app picks are authoritative.
 - `tournaments.ts` — 2026 schedule (45 events) with weeks, ISO dates, and
   major/signature/playoff tags.
-- `players.ts` — PGA Tour roster (~220 names) for the player autocomplete.
+- `players.ts` — PGA Tour + LIV roster (~255 names) for the player autocomplete.
 
-The app caches the loaded picks under the `localStorage` key
-`pappy-one-and-done-2026` (with `pappy-data-version` tracking which record
-version is cached). Use **Export JSON** to back up and **Reset Season** to
-clear. Finish strings are free text; auto-coloring: `WIN`/`1` → gold,
-top-10 → green, `MC`/`WD`/`DQ`/`CUT` → red.
+Picks are stored under the `localStorage` key `pappy-one-and-done-2026`
+(`pappy-baseline-applied` marks that the starting baseline has been seeded). Use
+**Export JSON** to back up and **Reset Season** to clear. Finish strings are
+free text; auto-coloring: `WIN`/`1` → gold, top-10 → green,
+`MC`/`WD`/`DQ`/`CUT` → red.
 
-## Updating the picks (weekly)
+## Making picks
 
-The committed record is the source of truth, so updating is a small code edit:
+Just use the app — **Add a Pick**, or click any cell to edit, or DELETE twice to
+remove. Every change saves to your browser immediately and sticks. One player
+per tournament; each player is usable only once all season (the autocomplete
+locks used names).
 
-1. Open **`src/data/seasonPicks.ts`**.
-2. Add or edit entries in `SEASON_PICKS` (one player per tournament; each player
-   used at most once all season). `finish` is free text — `T12`, `WIN`, `MC`,
-   `WD`, `5`, … — leave `''` until the event is played.
-3. **Bump `DATA_VERSION`** (e.g. to today's date). This is what tells already-open
-   browsers to adopt the new record instead of their cached copy.
-4. Commit and deploy. Every device shows the update next time it opens.
+Picks live on the device where you enter them (no cross-device sync). Use
+**Export JSON** to keep a backup.
 
-Tournament dates are filled in automatically from `src/data/tournaments.ts`.
+### Resetting everyone to a new baseline (rare)
 
-> The in-app Add/Edit/Delete controls still work and persist locally between
-> updates — handy for a quick tweak — but a deploy with a new `DATA_VERSION`
-> re-adopts the committed record (it wins). Treat `seasonPicks.ts` as the
-> book of record. **Export JSON** backs up whatever is currently loaded.
+`src/data/seasonPicks.ts` seeds a fresh browser. To force **every** device back
+to a specific list — a deliberate, destructive reset — edit `SEASON_PICKS` and
+change `BASELINE_VERSION`, then deploy. This overwrites whatever is saved on each
+device the next time it opens, so only do it on purpose.
 
 ## PWA / Add to Home Screen
 

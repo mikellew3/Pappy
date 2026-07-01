@@ -1,21 +1,21 @@
 // ===========================================================================
-// THE SEASON RECORD — source of truth for the 2026 picks.
+// STARTING BASELINE — used to seed the app the first time it runs on a device.
 //
-// This file is authoritative. When it changes and the app is redeployed, every
-// device adopts this list on next open (overriding any local in-app edits).
+// The app now SAVES your picks locally as soon as you enter them, and your
+// in-app edits are permanent — they are never overwritten. This list is only
+// the one-time starting point (applied once per browser, keyed by
+// BASELINE_VERSION). For normal weekly picks, just enter them in the app; they
+// save automatically.
 //
-// TO UPDATE WEEKLY:
-//   1. Add / edit entries in SEASON_PICKS below (one player per tournament,
-//      each player used at most once all season).
-//   2. Bump DATA_VERSION to today's date so devices pick up the change.
-//   3. Commit & deploy.
+// ⚠️  Changing BASELINE_VERSION REPLACES the picks currently saved on every
+//     device with this list. Only do that for a deliberate full reset.
 //
 // tournament_date is resolved automatically from TOURNAMENTS (src/data).
 // finish is free text: T12, WIN, MC, WD, 5, etc. Leave '' if not played yet.
 // ===========================================================================
 
-/** Bump this (e.g. to today's date) whenever SEASON_PICKS changes. */
-export const DATA_VERSION = '2026-06-21'
+/** ⚠️ Change ONLY for a deliberate reset — it overwrites every device's picks. */
+export const BASELINE_VERSION = '2026-06-21'
 
 export interface SeasonPick {
   tournament_name: string

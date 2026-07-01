@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { Pick } from '../lib/types'
 import { TOURNAMENTS } from '../data/tournaments'
-import { SEASON_PICKS, DATA_VERSION } from '../data/seasonPicks'
+import { SEASON_PICKS, BASELINE_VERSION } from '../data/seasonPicks'
 
 export interface NewPick {
   tournament_name: string
@@ -22,7 +22,9 @@ interface UsePicksResult {
 }
 
 const STORAGE_KEY = 'pappy-one-and-done-2026'
-const VERSION_KEY = 'pappy-data-version'
+// Marks that this device has applied the starting baseline. Once set, the
+// device's own picks are authoritative and are never overwritten again.
+const BASELINE_KEY = 'pappy-baseline-applied'
 
 const dateByName = new Map(TOURNAMENTS.map((t) => [t.name.toLowerCase(), t.start_date]))
 
@@ -64,7 +66,7 @@ function bundledPicks(): Pick[] {
 function save(picks: Pick[]): string | null {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(picks))
-    localStorage.setItem(VERSION_KEY, DATA_VERSION)
+    localStorage.setItem(BASELINE_KEY, BASELINE_VERSION)
     return null
   } catch {
     return 'Save failed'
@@ -72,19 +74,20 @@ function save(picks: Pick[]): string | null {
 }
 
 /**
- * Load picks. The committed file is the source of truth: when DATA_VERSION
- * changes (a new deploy with updated picks), the bundled record is adopted and
- * replaces local storage. Between updates, in-app edits persist locally.
+ * Load picks. This device's saved picks are authoritative — once entered, they
+ * persist and are never overwritten. The committed baseline is applied only
+ * once per browser (the first time, or after a deliberate BASELINE_VERSION
+ * reset); after that, load always returns what the user saved locally.
  */
 function load(): Pick[] {
   try {
-    const storedVersion = localStorage.getItem(VERSION_KEY)
     const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw && storedVersion === DATA_VERSION) {
+    const applied = localStorage.getItem(BASELINE_KEY)
+    if (raw && applied === BASELINE_VERSION) {
       return JSON.parse(raw) as Pick[]
     }
   } catch {
-    /* fall through to adopt bundled */
+    /* fall through to seed the baseline */
   }
   const picks = bundledPicks()
   save(picks)
