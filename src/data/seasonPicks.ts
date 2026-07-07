@@ -1,21 +1,14 @@
 // ===========================================================================
-// STARTING BASELINE — used to seed the app the first time it runs on a device.
+// STARTING PICKS — used to seed ONLY a brand-new browser (empty storage).
 //
-// The app now SAVES your picks locally as soon as you enter them, and your
-// in-app edits are permanent — they are never overwritten. This list is only
-// the one-time starting point (applied once per browser, keyed by
-// BASELINE_VERSION). For normal weekly picks, just enter them in the app; they
-// save automatically.
-//
-// ⚠️  Changing BASELINE_VERSION REPLACES the picks currently saved on every
-//     device with this list. Only do that for a deliberate full reset.
+// The app saves your picks locally the moment you enter them, and your saved
+// picks are always the source of truth. This list is never re-applied to a
+// browser that already has data — no deploy or code change can overwrite your
+// picks. To wipe and start over, use "Reset Season" in the app.
 //
 // tournament_date is resolved automatically from TOURNAMENTS (src/data).
 // finish is free text: T12, WIN, MC, WD, 5, etc. Leave '' if not played yet.
 // ===========================================================================
-
-/** ⚠️ Change ONLY for a deliberate reset — it overwrites every device's picks. */
-export const BASELINE_VERSION = '2026-06-21'
 
 export interface SeasonPick {
   tournament_name: string

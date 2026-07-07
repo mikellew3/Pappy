@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { Pick } from '../lib/types'
 import { TOURNAMENTS } from '../data/tournaments'
-import { SEASON_PICKS, BASELINE_VERSION } from '../data/seasonPicks'
+import { SEASON_PICKS } from '../data/seasonPicks'
 
 export interface NewPick {
   tournament_name: string
@@ -22,9 +22,6 @@ interface UsePicksResult {
 }
 
 const STORAGE_KEY = 'pappy-one-and-done-2026'
-// Marks that this device has applied the starting baseline. Once set, the
-// device's own picks are authoritative and are never overwritten again.
-const BASELINE_KEY = 'pappy-baseline-applied'
 
 const dateByName = new Map(TOURNAMENTS.map((t) => [t.name.toLowerCase(), t.start_date]))
 
@@ -66,7 +63,6 @@ function bundledPicks(): Pick[] {
 function save(picks: Pick[]): string | null {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(picks))
-    localStorage.setItem(BASELINE_KEY, BASELINE_VERSION)
     return null
   } catch {
     return 'Save failed'
@@ -74,20 +70,21 @@ function save(picks: Pick[]): string | null {
 }
 
 /**
- * Load picks. This device's saved picks are authoritative — once entered, they
- * persist and are never overwritten. The committed baseline is applied only
- * once per browser (the first time, or after a deliberate BASELINE_VERSION
- * reset); after that, load always returns what the user saved locally.
+ * Load picks. Your saved picks are the source of truth: once ANYTHING is stored
+ * locally, it is always used — no version checks, no re-seeding. Nothing a
+ * deploy or code change does can overwrite it. The committed SEASON_PICKS list
+ * seeds only a brand-new browser (empty storage). Clearing is done in-app via
+ * Reset Season.
  */
 function load(): Pick[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    const applied = localStorage.getItem(BASELINE_KEY)
-    if (raw && applied === BASELINE_VERSION) {
-      return JSON.parse(raw) as Pick[]
+    if (raw !== null) {
+      const parsed = JSON.parse(raw)
+      if (Array.isArray(parsed)) return parsed as Pick[]
     }
   } catch {
-    /* fall through to seed the baseline */
+    /* corrupt/absent — seed a fresh browser below */
   }
   const picks = bundledPicks()
   save(picks)

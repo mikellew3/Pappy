@@ -91,12 +91,12 @@ locks used names).
 Picks live on the device where you enter them (no cross-device sync). Use
 **Export JSON** to keep a backup.
 
-### Resetting everyone to a new baseline (rare)
+### Starting fresh
 
-`src/data/seasonPicks.ts` seeds a fresh browser. To force **every** device back
-to a specific list — a deliberate, destructive reset — edit `SEASON_PICKS` and
-change `BASELINE_VERSION`, then deploy. This overwrites whatever is saved on each
-device the next time it opens, so only do it on purpose.
+Your saved picks are always the source of truth — no deploy or code change ever
+overwrites them. `src/data/seasonPicks.ts` seeds **only** a brand-new browser
+(empty storage). To wipe and start over, use **Reset Season** in the app (or
+clear the `pappy-one-and-done-2026` localStorage key).
 
 ## PWA / Add to Home Screen
 
