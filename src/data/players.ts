@@ -1,4 +1,4 @@
-// PGA Tour + LIV Golf roster (255 players). Static reference data
+// PGA Tour + LIV Golf roster (256 players). Static reference data
 // powering the player autocomplete. LIV members are included since they are
 // eligible for the majors (and many hold PGA Tour membership). Edit to taste.
 
@@ -12,6 +12,7 @@ export const PLAYERS: string[] = [
   "Adrian Meronk",
   "Akshay Bhatia",
   "Alejandro Tosti",
+  "Alex Fitzpatrick",
   "Alex Noren",
   "Alex Smalley",
   "Anders Albertson",

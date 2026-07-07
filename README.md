@@ -35,8 +35,8 @@ reset). Picks persist per device; there is no cross-device sync.
 └── src/
     ├── main.tsx / App.tsx
     ├── context/                # Toast provider
-    ├── hooks/usePicks.ts       # localStorage cache over the committed record
-    ├── data/                   # tournaments, players, seasonPicks (the record)
+    ├── hooks/usePicks.ts       # localStorage-persisted picks (baseline seeds once)
+    ├── data/                   # tournaments, players, seasonPicks (starting baseline)
     ├── lib/                    # types, finish/format helpers
     └── components/             # Masthead, StatStrip, AddPickForm, PicksTable, …
 ```
@@ -73,7 +73,7 @@ All reference data lives in `src/data/` and is easy to edit by hand:
   live feed: after the first run, your in-app picks are authoritative.
 - `tournaments.ts` — 2026 schedule (45 events) with weeks, ISO dates, and
   major/signature/playoff tags.
-- `players.ts` — PGA Tour + LIV roster (~255 names) for the player autocomplete.
+- `players.ts` — PGA Tour + LIV roster (~256 names) for the player autocomplete.
 
 Picks are stored under the `localStorage` key `pappy-one-and-done-2026`
 (`pappy-baseline-applied` marks that the starting baseline has been seeded). Use
