@@ -40,8 +40,12 @@ export default defineConfig({
         ],
       },
       workbox: {
-        // Cache the app shell so the PWA opens offline. Supabase data
-        // requests fall through to the network when online.
+        // Cache the app shell so the PWA opens offline; data lives in
+        // localStorage. Take control immediately on a new deploy and drop old
+        // caches so roster/schedule updates show up without needing two opens.
+        skipWaiting: true,
+        clientsClaim: true,
+        cleanupOutdatedCaches: true,
         globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'],
         navigateFallback: '/index.html',
         runtimeCaching: [
