@@ -40,4 +40,6 @@ export const SEASON_PICKS: SeasonPick[] = [
   { tournament_name: 'RBC Canadian Open', player_name: 'Brooks Koepka', finish: '' },
   { tournament_name: 'U.S. Open', player_name: 'Patrick Reed', finish: 'MC' },
   { tournament_name: 'Travelers Championship', player_name: 'Russell Henley', finish: '' },
+  { tournament_name: 'Genesis Scottish Open', player_name: 'Alex Fitzpatrick', finish: '' },
+  { tournament_name: 'The Open Championship', player_name: 'Tyrrell Hatton', finish: '' },
 ]
