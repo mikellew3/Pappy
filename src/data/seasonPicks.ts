@@ -45,4 +45,5 @@ export const SEASON_PICKS: SeasonPick[] = [
   { tournament_name: 'The Open Championship', player_name: 'Tyrrell Hatton', finish: '' },
   { tournament_name: 'Rocket Classic', player_name: 'Wyndham Clark', finish: '' },
   { tournament_name: 'Wyndham Championship', player_name: 'Sungjae Im', finish: '' },
+  { tournament_name: 'FedEx St. Jude Championship', player_name: 'Tom Kim', finish: '' },
 ]
