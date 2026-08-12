@@ -42,4 +42,5 @@ export const SEASON_PICKS: SeasonPick[] = [
   { tournament_name: 'Travelers Championship', player_name: 'Russell Henley', finish: '' },
   { tournament_name: 'Genesis Scottish Open', player_name: 'Alex Fitzpatrick', finish: '' },
   { tournament_name: 'The Open Championship', player_name: 'Tyrrell Hatton', finish: '' },
+  { tournament_name: 'Rocket Classic', player_name: 'Wyndham Clark', finish: '' },
 ]
